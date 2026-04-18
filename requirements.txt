@@ -1,0 +1,5 @@
+# BullRun Radio — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+yfinance>=0.2.38       # NSE stock data via Yahoo Finance
+requests>=2.31.0       # HTTP calls (used internally by yfinance)
