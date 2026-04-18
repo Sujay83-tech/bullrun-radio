@@ -1,0 +1,81 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .github/workflows/daily-market-update.yml
+#
+# BullRun Radio — Daily Market Data Auto-Updater
+# Runs every day at 9:00 AM IST (3:30 AM UTC) on weekdays.
+# Also runs on Saturday for weekend crypto updates.
+# Can be triggered manually from GitHub Actions tab.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Daily Market Data Update
+
+on:
+  # ── Scheduled: 9:00 AM IST = 03:30 UTC ──────────────────────────────────
+  schedule:
+    - cron: "30 3 * * 1-6"   # Mon–Sat at 03:30 UTC (9:00 AM IST)
+
+  # ── Manual trigger from GitHub Actions UI ───────────────────────────────
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual run"
+        required: false
+        default: "Manual update"
+
+# ── Allow GitHub Actions to push commits back to the repo ─────────────────
+permissions:
+  contents: write
+
+jobs:
+  update-market-data:
+    name: Fetch & Inject Live Market Data
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout the repository ──────────────────────────────────────
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Set up Python 3.11 ───────────────────────────────────────────
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 3. Install dependencies ─────────────────────────────────────────
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── 4. Run the market data updater ──────────────────────────────────
+      - name: Run Market Data Updater
+        run: |
+          python update_market_data.py
+        env:
+          PYTHONUNBUFFERED: "1"
+
+      # ── 5. Commit & push if index.html changed ──────────────────────────
+      - name: Commit Updated index.html
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name  "BullRun Bot"
+
+          # Only commit if there are actual changes
+          if git diff --quiet index.html; then
+            echo "⚠️  No changes detected in index.html — skipping commit."
+          else
+            git add index.html
+            git commit -m "🤖 Auto-update: market data $(date +'%Y-%m-%d %H:%M IST')"
+            git push
+            echo "✅ Changes committed and pushed."
+          fi
+
+      # ── 6. (Optional) Notify on failure via GitHub issue ───────────────
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "::error::Market data update failed! Check logs above."
